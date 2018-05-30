@@ -16,18 +16,19 @@ uses
   ;
 
 type
-  FrameStandAttribute = class(TCustomAttribute);
+  FrameStandCustomAttribute = class(TCustomAttribute);
 
-  ContextAttribute = class(FrameStandAttribute);
+  ContextAttribute = class(FrameStandCustomAttribute);
+  FrameStandAttribute = class(ContextAttribute);
   StandAttribute = class(ContextAttribute);
   ContainerAttribute = class(ContextAttribute);
   FrameInfoAttribute = class(ContextAttribute);
   ParentAttribute = class(ContextAttribute);
   FrameIsOwnedAttribute = class(ContextAttribute);
 
-  BeforeShowAttribute = class(FrameStandAttribute);
-  ShowAttribute = class(FrameStandAttribute);
-  HideAttribute = class(FrameStandAttribute);
+  BeforeShowAttribute = class(FrameStandCustomAttribute);
+  ShowAttribute = class(FrameStandCustomAttribute);
+  HideAttribute = class(FrameStandCustomAttribute);
 
   TFrameClass = class of TFrame;
 
@@ -108,6 +109,7 @@ type
   end;
 
   TOnBeforeShowEvent = procedure(const ASender: TFrameStand; const AFrameInfo: TFrameInfo<TFrame>) of object;
+  TOnAfterHideEvent = TOnBeforeShowEvent;
   TOnBeforeStartAnimationEvent = procedure(const ASender: TFrameStand; const AFrameInfo: TFrameInfo<TFrame>; const AAnimation: TAnimation) of object;
   TOnBindCommonActionList = procedure(ASender: TFrameStand; const AFrameInfo: TFrameInfo<TFrame>; const AObject: TFmxObject; var ACommonActionName: string) of object;
 
@@ -136,6 +138,7 @@ type
     FAnimationShow: string;
     FOnGetFrameClass: TOnGetFrameClassEvent;
     FCommonActions: TCommonActionDictionary;
+    FOnAfterHide: TOnAfterHideEvent;
     FOnBeforeShow: TOnBeforeShowEvent;
     FOnBeforeStartAnimation: TOnBeforeStartAnimationEvent;
     FCommonActionList: TActionList;
@@ -174,6 +177,7 @@ type
     property StyleBook: TStyleBook read FStyleBook write FStyleBook;
 
     // Events
+    property OnAfterHide: TOnAfterHideEvent read FOnAfterHide write FOnAfterHide;
     property OnBeforeShow: TOnBeforeShowEvent read FOnBeforeShow write FOnBeforeShow;
     property OnBeforeStartAnimation: TOnBeforeStartAnimationEvent read FOnBeforeStartAnimation write FOnBeforeStartAnimation;
     property OnBindCommonActionList: TOnBindCommonActionList read FOnBindCommonActionList write FOnBindCommonActionList;
@@ -376,7 +380,7 @@ var
   LCommonActionPattern: string;
 begin
   Result := False;
-  if not (AObject is TButton) then
+  if not (AObject is TControl) then
     Exit;
 
   for LCommonActionPattern in FrameStand.CommonActions.Keys do
@@ -387,7 +391,7 @@ begin
        )
     then
     begin
-      TButton(AObject).OnClick := DoCommonActionClick;
+      TControl(AObject).OnClick := DoCommonActionClick;
       Result := True;
       Break; // no need to continue since DoCommonActionClick will fire all CommonActions that match
     end;
@@ -480,7 +484,8 @@ begin
     FContainer.RemoveObject(FFrame);
   end;
 
-  Parent.RemoveObject(Stand);
+  if not (csDestroying in FFrameStand.ComponentState) then
+    Parent.RemoveObject(Stand);
   Parent := nil;
 
   if not (csDestroying in FFrameStand.ComponentState) then
@@ -751,6 +756,9 @@ begin
 
         if Assigned(AThen) then
           AThen();
+
+        if Assigned(FrameStand) and Assigned(FrameStand.OnAfterHide) then
+          FrameStand.OnAfterHide(FrameStand, TFrameInfo<TFrame>(Self));
       end
     );
   end;
